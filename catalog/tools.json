@@ -1,0 +1,404 @@
+{
+  "version": 1,
+  "tools": [
+  {
+  "name": "web_fetch",
+  "source": "NATIVE",
+  "target": "web_fetch",
+  "description": "Read-only web content retrieval. Fetches readable content from an absolute HTTP/HTTPS URL. Uses the native retrieval fallback chain internally. Use for reading, extracting, summarizing, or inspecting web content; do not use for browser interaction or changing website state. When deepScraping=true, also fetches up to maxLinks unique same-domain links discovered directly from the starter page. Deep scraping is not recursive.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Absolute HTTP or HTTPS URL to fetch."
+      },
+      "maxCharacters": {
+        "type": "integer",
+        "description": "Maximum characters returned per fetched page. Defaults to 5000.",
+        "default": 500000,
+        "minimum": 500,
+        "maximum": 50000
+      },
+      "deepScraping": {
+        "type": "boolean",
+        "description": "Fetch the starter page plus up to maxLinks direct same-domain links. Use when the user explicitly requests deeper, linked, related, or broader page retrieval.",
+        "default": false
+      },
+      "maxLinks": {
+        "type": "integer",
+        "description": "Maximum direct same-domain links fetched when deepScraping is enabled. Defaults to 5.",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 10
+      }
+    },
+    "required": ["url"],
+    "additionalProperties": false
+  },
+  "requiredPermission": null,
+  "enabled": true
+},
+{
+  "name": "extract",
+  "source": "NATIVE",
+  "target": "extract",
+  "description": "Extract all available structured and readable data from a supported source. The source can be a local file, file path, HTTP/HTTPS URL, or raw content. The source type is automatically detected and the appropriate extractor is selected.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "object",
+        "description": "The source to extract from. Pass exactly one key: {\"url\": \"https://...\"} for a web URL, {\"path\": \"/path/to/file.pdf\"} for a local file or \"s3://bucket/key.pdf\" for an S3 object (with sibling \"credentials\"), {\"file\": \"/path/to/file\"} as an alias for path, or {\"content\": \"raw text or JSON\"} for inline content. Supported file formats: PDF, DOCX, CSV, XLSX/XLS, images, HTML, JSON, XML, email, Markdown. For a file referenced by an attachment's fileId, leave \"path\" empty and send \"attachments\": [{\"fileId\": ...}] as a sibling of \"input\" instead — the kernel resolves it (local path or S3 download) and fills \"path\"/\"credentials\" itself; never invent a value here.",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to an existing local file, e.g. \"/tmp/report.pdf\", or an \"s3://bucket/key\" URI (requires sibling \"credentials\")."
+          },
+          "file": {
+            "type": "string",
+            "description": "Alias for path. Path to an existing local file."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "HTTP or HTTPS URL to extract content from, e.g. \"https://example.com/page\"."
+          },
+          "content": {
+            "description": "Raw content to extract. Can be a string, JSON object, or JSON array.",
+            "oneOf": [
+              { "type": "string" },
+              { "type": "object" },
+              { "type": "array" }
+            ]
+          },
+          "credentials": {
+            "type": "object",
+            "description": "AWS credentials for an s3:// \"path\" — {\"access_id\": ..., \"access_key\": ...}. Kernel-injected only; never set this yourself.",
+            "properties": {
+              "access_id": { "type": "string" },
+              "access_key": { "type": "string" }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "required": ["source"],
+    "additionalProperties": false
+  }
+},
+    {
+  "name": "summarize",
+  "source": "NATIVE",
+  "target": "summarize",
+  "description": "Generate a comprehensive summary of the given text AND store it as a real file in ONE call, returning a fileId. Use this whenever a task's job is to summarize something that will later be stored (e.g. via kb.ingest) — do not compose the summary yourself first; this tool does both. The summary defaults to comprehensive (covering every major section/point, proportional to the source's length) unless \"instructions\" says otherwise.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "description": "The source text to summarize, e.g. a document's full extracted text."
+      },
+      "fileName": {
+        "type": "string",
+        "description": "Optional file name for the stored summary, e.g. \"summary.txt\". Defaults to \"summary.txt\"."
+      },
+      "instructions": {
+        "type": "string",
+        "description": "Optional extra guidance for the summary, e.g. \"keep it under 100 words\" if the user explicitly asked for brevity. Omit for the default comprehensive summary."
+      },
+      "modelConfiguration": {
+        "type": "object",
+        "description": "The model to use for generating the summary. Kernel/agent-runtime-injected only — never set this yourself."
+      }
+    },
+    "required": ["text"],
+    "additionalProperties": false
+  }
+},
+    {
+  "name": "analyze",
+  "source": "NATIVE",
+  "target": "analyze",
+  "description": "Produce a DETAILED analysis of the given content AND store it as a real text file in ONE call, returning a fileId. Examines the content in depth — spreadsheet data, extracted document text, or anything else — and surfaces every significant pattern, trend, relationship, and anomaly. Use this when a task's query wants insights/analysis back as text, WITHOUT a formatted report document. If the query asks for an actual report/document, use generate_report instead.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "content": {
+        "type": "string",
+        "description": "The data to analyze, e.g. the extract tool's output for a spreadsheet/document, or any other text."
+      },
+      "fileName": {
+        "type": "string",
+        "description": "Optional file name for the stored analysis, e.g. \"analysis.txt\". Defaults to \"analysis.txt\"."
+      },
+      "instructions": {
+        "type": "string",
+        "description": "Optional extra guidance for the analysis, e.g. \"focus on Q3 figures\"."
+      },
+      "modelConfiguration": {
+        "type": "object",
+        "description": "The model to use for generating the analysis. Kernel/agent-runtime-injected only — never set this yourself."
+      }
+    },
+    "required": ["content"],
+    "additionalProperties": false
+  }
+},
+    {
+  "name": "generate_report",
+  "source": "NATIVE",
+  "target": "generate_report",
+  "description": "Analyze the given content AND write a complete, properly structured report (title, executive summary, detailed findings, conclusions/recommendations) as a real PDF or DOCX file in ONE call, returning a fileId. Use this whenever a task's query asks for an actual report/document — do not compose the report yourself first or call a separate rendering tool; this tool does both the analysis and the document creation. For analysis-only output with no rendered document, use analyze instead. \"content\" may be raw extracted data or already-analyzed text from a prior analyze call.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "content": {
+        "type": "string",
+        "description": "The data to report on, e.g. the extract tool's output, or analyze's already-detailed output."
+      },
+      "format": {
+        "type": "string",
+        "description": "Document format: \"docx\" or \"pdf\". Defaults to \"docx\"."
+      },
+      "fileName": {
+        "type": "string",
+        "description": "Optional file name for the report, e.g. \"q3_report.pdf\". Defaults to \"report.docx\"/\"report.pdf\" per format."
+      },
+      "instructions": {
+        "type": "string",
+        "description": "Optional extra guidance for the report, e.g. \"focus on Q3 figures\"."
+      },
+      "modelConfiguration": {
+        "type": "object",
+        "description": "The model to use for generating the report. Kernel/agent-runtime-injected only — never set this yourself."
+      }
+    },
+    "required": ["content"],
+    "additionalProperties": false
+  }
+},
+    {
+      "name": "web_search",
+      "source": "NATIVE",
+      "target": "web_search",
+      "description": "Search the web for a query and return a list of relevant results (title, URL, snippet). Uses a headless browser against DuckDuckGo's HTML results — no API key required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query."
+          },
+          "numResults": {
+            "type": "integer",
+            "description": "Maximum number of results to return. Default 5, capped at 25.",
+            "default": 5
+          },
+          "freshness": {
+            "type": "string",
+            "description": "Optional recency hint for results (currently advisory only)."
+          },
+          "safeSearch": {
+            "type": "boolean",
+            "description": "Whether to apply safe-search filtering. Default true.",
+            "default": true
+          }
+        },
+        "required": ["query"]
+      },
+      "requiredPermission": null,
+      "enabled": true
+    },
+    {
+      "name": "batch_process",
+      "source": "NATIVE",
+      "target": "batch_process",
+      "description": "Two-mode tool for bulk file processing. MODE 1 — INSPECT (task-1): call with inspectOnly=true and just the file path to get column names and 3 sample rows. MODE 2 — EXECUTE (task-2): call with file, expression (Jinja2 mapping from column names to nextTool args), and nextTool. The tool reads ALL rows internally and calls nextTool once per row — you never see the row data. Use google_workspace.send_gmail_message (MCP) or GMAIL (API) as nextTool for email sending.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Absolute local path or http(s):// URL to the data file."
+          },
+          "expression": {
+            "type": "object",
+            "description": "Dict of {toolArgName: \"Jinja2 template using {{row.column_name}}\"} written by the worker after inspecting the file. Each value is rendered per row to produce the next tool's input dict.",
+            "additionalProperties": { "type": "string" }
+          },
+          "nextTool": {
+            "type": "string",
+            "description": "Exact catalog name of the tool to call for each row, e.g. \"google_workspace.send_gmail_message\"."
+          },
+          "fileType": {
+            "type": "string",
+            "description": "File format: \"csv\", \"tsv\", \"excel\", \"json\", or \"auto\" (default). Auto-detected from file extension when omitted.",
+            "default": "auto",
+            "enum": ["auto", "csv", "tsv", "excel", "json"]
+          },
+          "csvDelimiter": {
+            "type": "string",
+            "description": "Column delimiter for CSV/TSV files. Default \",\".",
+            "default": ","
+          },
+          "maxConcurrency": {
+            "type": "integer",
+            "description": "Maximum parallel tool calls at once. Default 5. Hard-capped at 50.",
+            "default": 5
+          },
+          "stopOnFirstError": {
+            "type": "boolean",
+            "description": "Abort the batch after the first row failure. Default false.",
+            "default": false
+          },
+          "includeSuccesses": {
+            "type": "boolean",
+            "description": "Include successful row results in output. Keep false for large batches. Default false.",
+            "default": false
+          },
+          "rowLimit": {
+            "type": "integer",
+            "description": "Safety cap — process at most this many rows. Default 100000.",
+            "default": 100000
+          },
+          "inspectOnly": {
+            "type": "boolean",
+            "description": "If true, read the file and return column names + 5 sample rows without calling any tool. Use for task-1 file inspection.",
+            "default": false
+          }
+        },
+        "required": ["file"]
+      },
+      "requiredPermission": null,
+      "enabled": true
+    },
+    {
+      "toolId": "01",
+      "name": "GMAIL_send",
+      "toolName": "GMAIL",
+      "category": "",
+      "source": "API",
+      "target": "GMAIL_send",
+      "description": "Send a Gmail message via the backend workflow API (REST/DAG path).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "Recipient email address."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject line."
+          },
+          "message": {
+            "type": "string",
+            "description": "Email message content (plain text or HTML)."
+          }
+        },
+        "required": ["to", "subject", "message"]
+      },
+      "dagConfig": {
+        "value": "GMAIL",
+        "name": "Gmail - Send a message",
+        "expressionExecutionName": "Gmail - Send a message",
+        "defaultParameters": {
+          "resource": "message",
+          "operation": "send",
+          "Content-Type": "text/plain"
+        },
+        "requiresAuth": true,
+        "credentialId": 332
+      },
+      "requiredPermission": null,
+      "enabled": true
+    },
+    {
+      "toolId": "02",
+      "name": "GOOGLE_SHEETS_get_rows",
+      "toolName": "GOOGLE_SHEETS",
+      "category": "",
+      "source": "API",
+      "target": "GOOGLE_SHEETS_get_rows",
+      "description": "Get rows from a Google Sheets spreadsheet via the backend workflow API.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spreadsheet_id": {
+            "type": "string",
+            "description": "The ID of the Google Sheets spreadsheet."
+          },
+          "sheet_name": {
+            "type": "string",
+            "description": "Name of the sheet tab to read from."
+          },
+          "filters": {
+            "type": "object",
+            "description": "Optional filter criteria for rows."
+          }
+        },
+        "required": ["spreadsheet_id", "sheet_name"]
+      },
+      "dagConfig": {
+        "value": "GOOGLE SHEETS",
+        "name": "Google Sheets - Get Row(s)",
+        "expressionExecutionName": "Google Sheets - Get Row(s)",
+        "defaultParameters": {
+          "resource": "sheet_within_document",
+          "operation": "get_rows",
+          "combine_filters": "and"
+        },
+        "requiresAuth": true,
+        "credentialId": 203
+      },
+      "requiredPermission": null,
+      "enabled": true
+    },
+    {
+  "name": "web_interact",
+  "source": "NATIVE",
+  "target": "web_interact",
+  "description": "Interact with a website through a browser using natural-language instructions. The tool can navigate pages and perform supported browser actions such as clicking, typing, filling forms, selecting options, scrolling, waiting, and taking screenshots. It can pause before consequential actions when confirmation is required.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Absolute http:// or https:// URL where the browser task should begin."
+      },
+      "instruction": {
+        "type": "string",
+        "description": "Natural-language instruction describing the browser workflow to perform, including the required actions, target elements, data to enter, and constraints."
+      },
+      "max_steps": {
+        "type": "integer",
+        "description": "Maximum number of browser-agent steps allowed. Default 50. Must be between 1 and 80.",
+        "default": 50,
+        "minimum": 1,
+        "maximum": 80
+      },
+      "timeout_seconds": {
+        "type": "integer",
+        "description": "Maximum browser task timeout in seconds. Default 60. Must be between 5 and 120.",
+        "default": 60,
+        "minimum": 5,
+        "maximum": 120
+      },
+      "require_confirmation": {
+        "type": "boolean",
+        "description": "Require confirmation before consequential actions such as submitting, creating, deleting, sending, publishing, or updating data. Default false.",
+        "default": false
+      }
+    },
+    "required": [
+      "url",
+      "instruction"
+    ]
+  },
+  "requiredPermission": null,
+  "enabled": true
+  }
+  ]
+}
